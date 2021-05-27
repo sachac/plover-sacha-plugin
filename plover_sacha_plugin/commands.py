@@ -17,11 +17,18 @@ def get_last_clippy(engine):
     strokes = re.split(', ', alternatives)
     return {'translation': translation, 'alternatives': alternatives, 'strokes': strokes}
 
+def spectra_last_clippy_command(engine, args):
+    last_clippy = get_last_clippy(engine)
+    data = last_clippy['translation']
+    subprocess.run(["xclip", '-selection', 'clipboard'], universal_newlines=True, input=data)
+    print(data)
+    subprocess.run(['xdotool', 'search', '--onlyvisible', '--name', 'The Spectra Project', 'windowactivate', '--sync', 'mousemove', '67', '130', 'click', '1', 'key', 'ctrl+a', 'ctrl+v', 'sleep', '0.5', 'mousemove', '73', '164', 'click', '1'])
+    
 def notify_last_clippy_command(engine, args):
     last_clippy = get_last_clippy(engine)
-    subprocess.call(['notify-send', "%s -> %s" % (last_clippy['translation'], last_clippy['alternatives']), "--expire-time", "3000"])
-    print(get_spectra_svg(translation, outline))
-
+    info = "%s -> %s" % (last_clippy['translation'], last_clippy['alternatives'])
+    subprocess.call(['notify-send', info, "--expire-time", "3000"])
+    
 def notify(engine, args):
     subprocess.call(['notify-send', args, "--expire-time", "3000"])
 
@@ -29,10 +36,18 @@ def notify(engine, args):
    # -H 'Content-Type: application/json' \
    # --data-raw '{"action":"query_match","args":["test",["T*ES","TEF","TEFLT","TEFT"]],"options":{"search_mode_strokes":false,"search_mode_regex":false,"board_aspect_ratio":4.676,"board_show_compound":1,"board_show_letters":1}}' \
 
-def get_spectra_svg(translation, outline):
+def get_spectra_rules(translation, outline):
     global SPECTRA_URL
-    r = requests.get(SPECTRA_URL + '/request', json={'action': 'query_match', 'args': [translation, [outline]], 'options': {'search_mode_strokes': false, 'search_mode_regex': false, 'board_aspect_ratio': 4.676, 'board_show_compound': 1, 'board_show_letters': 1}})
-    return r.json()
+    json_data = {'action': 'query_match', 'args': [translation, outline], 'options': {'search_mode_strokes': False, 'search_mode_regex': False, 'board_aspect_ratio': 4.676, 'board_show_compound': 1, 'board_show_letters': 1}}
+    r = requests.post(SPECTRA_URL + '/request', json=json_data)
+    return [x['caption'] for key, x in list(r.json()['display']['pages_by_ref'].items())[1:]]
+    
+def get_spectra_svg(translation, outlines):
+    global SPECTRA_URL
+    json_data = {'action': 'query_match', 'args': [translation, outlines], 'options': {'search_mode_strokes': False, 'search_mode_regex': False, 'board_aspect_ratio': 4.676, 'board_show_compound': 1, 'board_show_letters': 1}}
+    print(json_data)
+    r = requests.post(SPECTRA_URL + '/request', json=json_data)
+    return r.json()['display']['default_page']['board']
     
 def anki_last_clippy_command(engine, args):
     last_clippy = get_last_clippy(engine)
@@ -73,12 +88,9 @@ def toggle_window(engine, args):
     type_flag = '--' + type
     matching_wids = subprocess.run(['xdotool', 'search', type_flag, id], stdout=subprocess.PIPE).stdout.decode('utf-8')
     matching_wids = re.split('\n', matching_wids)
-    print('matching', matching_wids)
-    print('current x' + current_wid + 'x', current_wid in matching_wids)
     if current_wid in matching_wids:
         subprocess.run(['xdotool', 'key', 'Alt+Tab'])
     else:
-        print(['xdotool', 'search', '--onlyvisible', type_flag, id, 'windowactivate'])
         subprocess.run(['xdotool', 'search', '--onlyvisible', type_flag, id, 'windowactivate'])
         
     
