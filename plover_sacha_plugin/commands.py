@@ -5,7 +5,7 @@ import requests
 
 SPECTRA_URL='http://127.0.0.1:8081'
 
-def emacsclient(engine, argument):
+def emacsclient_command(engine, argument):
     global state
     subprocess.Popen(["emacsclient", "-e", argument])
 
@@ -76,7 +76,7 @@ def anki_last_clippy_command(engine, args):
         notify(engine, 'error adding Anki note: ' + result['error'])
     print(r.json())
 
-def toggle_window(engine, args):
+def toggle_window_command(engine, args):
     args = re.split(':', args)
     if len(args) == 1:
         type = 'name'
@@ -93,4 +93,32 @@ def toggle_window(engine, args):
     else:
         subprocess.run(['xdotool', 'search', '--onlyvisible', type_flag, id, 'windowactivate'])
         
-    
+def emacs_eval_command(engine, args):
+    engine._send_key_combination("Alt_L(Shift_L(semicolon))")
+    engine._send_string(args)
+    engine._send_key_combination("Return")
+
+def emacs_mx_command(engine, args):
+    engine._send_key_combination("Alt_L(x)")
+    engine._send_string(args)
+    engine._send_key_combination("Return")
+
+from serial import Serial
+from serial.tools.list_ports import comports
+
+def fix_ports_command(engine, args):
+    print("Trying to fix port")
+    ports = sorted(x[0] for x in comports())
+    if len(ports) > 0:
+        print(engine._machine.serial_params)
+        engine._machine.serial_params.port = ports[0]
+        engine._machine.start_capture()
+
+from PyQt5.QtWidgets import QAction, QApplication
+from plover.gui_qt.main_window import MainWindow
+
+# https://github.com/openstenoproject/plover/discussions/1339
+def toolbar_command(engine, args):
+    main_window ,= [x for x in QApplication.instance().topLevelWidgets() if isinstance(x, MainWindow)]
+    action ,= [x for x in main_window.toolbar.children() if isinstance(x, QAction) and x.text() == args]
+    action.triggered.emit()
