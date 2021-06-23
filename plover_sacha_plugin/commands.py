@@ -5,10 +5,45 @@ import requests
 
 SPECTRA_URL='http://127.0.0.1:8081'
 
+def translate_emacs_key(s):
+    dict = {'RET': 'Return',
+            'SPC': 'space',
+            '/': 'slash',
+            '!': 'exclam',
+            '(': 'parenleft',
+            ')': 'parenright',
+            '.': 'period',
+            ';': 'semicolon',
+            ':': 'colon',
+            ',': 'comma',
+            '-': 'hyphen',
+            '=': 'equal',
+            '&': 'ampersand'}
+    if s in dict:
+        return dict[s]
+    else:
+        return s
+    
+def emacs_key_command(engine, argument):
+    keys = re.split(' ', argument)
+    for key in keys:
+        key = re.sub(r'M-(.+)', r'Alt_L(\1)', key)
+        key = re.sub(r'C-(.+)', r'Control_L(\1)', key)
+        key = re.sub(r'S-(.+)', r'Shift_L(\1)', key)
+        key = re.sub(r's-(.+)', r'Super_L(\1)', key)
+        key = re.sub(r'\(([^)]+)\)', lambda x: '(' + translate_emacs_key(x.group(1)) + ')', key)
+        print(key)
+        engine._send_key_combination(key)
+        
 def emacsclient_command(engine, argument):
-    global state
     subprocess.Popen(["emacsclient", "-e", argument])
 
+def emacsclient_current_command(engine, argument):
+    subprocess.Popen(["emacsclient", "-e", "(with-current-buffer (window-buffer) " + argument + ")"])
+
+def emacsclient_momentary_string(engine, argument):
+    subprocess.Popen(["emacsclient", "-e", "(with-current-buffer (window-buffer) (momentary-string-display \"" + argument + "\" (point) ?\\0 \"\")"])
+    
 def get_last_clippy(engine):
     line = subprocess.check_output(['tail', '-1', os.path.join(os.path.dirname(engine._config.path), 'clippy.txt')]).decode('utf-8')
     m = re.match('[^]]+\] (.*?)[ \t]+\|\| (.*?) -> ([^\n]+)', line)
@@ -122,3 +157,17 @@ def toolbar_command(engine, args):
     main_window ,= [x for x in QApplication.instance().topLevelWidgets() if isinstance(x, MainWindow)]
     action ,= [x for x in main_window.toolbar.children() if isinstance(x, QAction) and x.text() == args]
     action.triggered.emit()
+
+mode_states = []
+
+def mode_state_meta(ctx, cmdline):
+    global mode_states
+    """
+    cmdline should be save or restore.
+    """
+    action = ctx.copy_last_action()
+    if cmdline == "save":
+        mode_states.append(action)
+    elif cmdline == "restore" and len(mode_states) >= 1:
+        action = mode_states.pop()
+    return action
